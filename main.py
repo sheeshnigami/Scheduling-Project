@@ -1,13 +1,17 @@
 import sys
 from interface import Ui_MainWindow
+from view import ViewManager
+from add import Add
+from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QMainWindow
+from PyQt5.QtSql import QSqlDatabase, QSqlQuery
 from PyQt5.QtCore import Qt
-from PyQt5.QtSql import QSqlTableModel, QSqlDatabase, QSqlQuery
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
         QMainWindow.__init__(self)
-        
+
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
 
@@ -15,73 +19,58 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Scheduling System")
 
         self.db = self.connect_to_db()
-        self.ui.comboBox_view.addItems(["Student", "Teacher"])
+        self.ui.comboBox_view.addItems(
+            ["Student", "Teacher", "Department", "Subject", "Subject Schedule"]
+        )
+        self.view_manager = ViewManager(self.ui, self.db)
+        self.add_data = Add(self.ui, self.ui.stackedWidget_pages)
 
         # Navigation Buttons
-        self.ui.pushButton_home.clicked.connect(lambda: self.ui.stackedWidget_pages.setCurrentIndex(1))
+        self.ui.pushButton_back.clicked.connect(self.clear_formLayout_addForm)
+        self.ui.pushButton_home.clicked.connect(
+            lambda: self.ui.stackedWidget_pages.setCurrentIndex(1)
+        )
+        self.ui.pushButton_students.clicked.connect(lambda: self.nav_view("Student"))
+        self.ui.pushButton_teachers.clicked.connect(lambda: self.nav_view("Teacher"))
 
         # Main Content Buttons
         self.ui.pushButton_view.clicked.connect(lambda: self.page_view())
-        self.ui.pushButton_add.clicked.connect(lambda: self.ui.stackedWidget_pages.setCurrentIndex(2))
+        self.ui.pushButton_add.clicked.connect(
+            lambda: self.ui.stackedWidget_pages.setCurrentIndex(2)
+        )
 
-    # Main Content Page
+        # Add Button
+        self.ui.pushButton_addStudent.clicked.connect(lambda: self.add_data.add_student())
+        self.ui.pushButton_addTeacher.clicked.connect(lambda: self.add_data.add_teacher())
+        self.ui.pushButton_addDepartment.clicked.connect(lambda: self.add_data.add_department())
+        self.ui.pushButton_addCourse.clicked.connect(lambda: self.add_data.add_course())
+        self.ui.pushButton_addSubject.clicked.connect(lambda: self.add_data.add_subject())
+        self.ui.pushButton_addBlock.clicked.connect(lambda: self.add_data.add_block())
+        self.ui.pushButton_addRoom.clicked.connect(lambda: self.add_data.add("room"))
+
+    def nav_view(self, button):
+        if button == "Student":
+            self.ui.comboBox_view.setCurrentText("Student")
+            self.ui.stackedWidget_pages.setCurrentIndex(0)
+            self.page_view()
+        elif button == "Teacher":
+            self.ui.comboBox_view.setCurrentText("Teacher")
+            self.ui.stackedWidget_pages.setCurrentIndex(0)
+            self.page_view()
+
+    # View Page
     def page_view(self):
         self.ui.stackedWidget_pages.setCurrentIndex(0)
         self.update_view()
         self.ui.comboBox_view.currentTextChanged.connect(self.update_view)
 
-    # Update View Page
     def update_view(self):
-        if self.ui.comboBox_view.currentText() == "Student":
-            self.ui.label_view.setText("Student List")
-
-            # Set up the model for the student table
-            self.model = QSqlTableModel(self, self.db)
-            self.model.setTable("student")
-            self.model.select()
-
-            self.model.setHeaderData(0, Qt.Horizontal, "ID")
-            self.model.setHeaderData(1, Qt.Horizontal, "Full Name")
-            self.model.setHeaderData(2, Qt.Horizontal, "Course")
-            self.model.setHeaderData(3, Qt.Horizontal, "Block")
-
-            self.ui.tableView_view.setModel(self.model)
-            
-            # Configure the table view
-            self.ui.tableView_view.resizeColumnsToContents()  # Adjust column widths
-            self.ui.tableView_view.resizeRowsToContents()     # Adjust row heights
-            self.ui.tableView_view.setSortingEnabled(True)    # Enable sorting by column
-            self.model.setSort(-1, Qt.AscendingOrder)  # -1 means no sort column
-            self.model.select()
-            self.ui.tableView_view.setSelectionBehavior(self.ui.tableView_view.SelectRows)  # Select entire rows
-            self.ui.tableView_view.setEditTriggers(self.ui.tableView_view.NoEditTriggers)   # Make table read-only
-            self.ui.tableView_view.verticalHeader().setVisible(False)  # Hide row numbers
-            
-            self.ui.tableView_view.doubleClicked.connect(self.page_info)  # Connect row click to info page
- 
-
-        elif self.ui.comboBox_view.currentText() == "Teacher":
-            self.ui.label_view.setText("Teacher List")
-
-            # Set up the model for the teacher table
-            self.model = QSqlTableModel(self, self.db)
-            self.model.setTable("teacher")
-            self.model.select()
-
-            self.model.setHeaderData(0, Qt.Horizontal, "ID")
-            self.model.setHeaderData(1, Qt.Horizontal, "Full Name")
-            self.model.setHeaderData(2, Qt.Horizontal, "Department")
-
-            self.ui.tableView_view.setModel(self.model)
-
-            # Configure the table view
-            self.ui.tableView_view.resizeColumnsToContents()  # Adjust column widths
-            self.ui.tableView_view.resizeRowsToContents()     # Adjust row heights
-            self.ui.tableView_view.setSortingEnabled(True)    # Enable sorting by column
-            self.model.setSort(-1, Qt.AscendingOrder)  # -1 means no sort column
-            self.model.select()
-            self.ui.tableView_view.setSelectionBehavior(self.ui.tableView_view.SelectRows)  # Select entire rows
-            self.ui.tableView_view.setEditTriggers(self.ui.tableView_view.NoEditTriggers)   # Make table read-only
+        combo_value = self.ui.comboBox_view.currentText()
+        self.model = self.view_manager.update_view(
+            tableView_view=self.ui.tableView_view,
+            combo_value=combo_value,
+            page_info_callback=self.page_info if combo_value == "Student" else None,
+        )
 
     # Info Page
     def page_info(self, index):
@@ -106,6 +95,17 @@ class MainWindow(QMainWindow):
             print("Database Error:", db.lastError().text())
             raise Exception("Could not open database.")
         return db
+
+    def clear_formLayout_addForm(self):
+        if self.ui.stackedWidget_pages.currentIndex() == 4:
+            layout = self.ui.formLayout_addForm
+            while layout.count():
+                item = layout.takeAt(0)
+                widget = item.widget()
+                if widget is not None:
+                    widget.setParent(None)
+            self.ui.stackedWidget_pages.setCurrentIndex(2)
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

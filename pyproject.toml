@@ -1,0 +1,10 @@
+[project]
+name = "scheduling-project"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pyqt5-qt5==5.15.2",
+    "pyqt5-tools>=5.15.9.3.3",
+]
