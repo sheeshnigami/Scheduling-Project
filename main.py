@@ -2,15 +2,17 @@ import sys
 from interface import Ui_MainWindow
 from view import ViewManager
 from add import Add
-from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QApplication, QMainWindow
+from info import Info
+from enroll import Enroll
+from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox
 from PyQt5.QtSql import QSqlDatabase, QSqlQuery
 from PyQt5.QtCore import Qt
+import os
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
-        QMainWindow.__init__(self)
+        super().__init__()
 
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
@@ -18,74 +20,109 @@ class MainWindow(QMainWindow):
         self.show()
         self.setWindowTitle("Scheduling System")
 
+        # Initialize database and managers
         self.db = self.connect_to_db()
-        self.ui.comboBox_view.addItems(
-            ["Student", "Teacher", "Department", "Subject", "Subject Schedule"]
-        )
         self.view_manager = ViewManager(self.ui, self.db)
         self.add_data = Add(self.ui, self.ui.stackedWidget_pages)
-
-        # Navigation Buttons
-        self.ui.pushButton_back.clicked.connect(self.clear_formLayout_addForm)
-        self.ui.pushButton_home.clicked.connect(
-            lambda: self.ui.stackedWidget_pages.setCurrentIndex(1)
+        self.info = Info(
+            self.ui, self.ui.stackedWidget_pages, self.db, self.view_manager
         )
-        self.ui.pushButton_students.clicked.connect(lambda: self.nav_view("Student"))
-        self.ui.pushButton_teachers.clicked.connect(lambda: self.nav_view("Teacher"))
+        self.enroll = Enroll(self.ui, self.ui.stackedWidget_pages)
 
-        # Main Content Buttons
-        self.ui.pushButton_view.clicked.connect(lambda: self.page_view())
+        # Setup UI components
+        self.setup_combo_box()
+        self.setup_navigation_buttons()
+        self.setup_main_content_buttons()
+        self.setup_add_buttons()
+
+    # Setup ComboBox
+    def setup_combo_box(self):
+        self.ui.comboBox_view.addItems(
+            [
+                "student",
+                "teacher",
+                "department",
+                "subject",
+                "course",
+                "block",
+                "room",
+                "room schedule",
+                "subject schedule",
+            ]
+        )
+        self.ui.comboBox_view.currentTextChanged.connect(self.update_view)
+
+    # Setup Navigation Buttons
+    def setup_navigation_buttons(self):
+        navigation_buttons = {
+            self.ui.pushButton_back: 2,
+            self.ui.pushButton_home: 1,
+            self.ui.pushButton_nav_add: 2,
+        }
+        for button, page_index in navigation_buttons.items():
+            button.clicked.connect(
+                lambda _, index=page_index: self.ui.stackedWidget_pages.setCurrentIndex(
+                    index
+                )
+            )
+
+        self.ui.pushButton_nav_view.clicked.connect(self.page_view)
+
+    # Setup Main Content Buttons
+    def setup_main_content_buttons(self):
+        self.ui.pushButton_view.clicked.connect(self.page_view)
         self.ui.pushButton_add.clicked.connect(
             lambda: self.ui.stackedWidget_pages.setCurrentIndex(2)
         )
 
-        # Add Button
-        self.ui.pushButton_addStudent.clicked.connect(lambda: self.add_data.add_student())
-        self.ui.pushButton_addTeacher.clicked.connect(lambda: self.add_data.add_teacher())
-        self.ui.pushButton_addDepartment.clicked.connect(lambda: self.add_data.add_department())
-        self.ui.pushButton_addCourse.clicked.connect(lambda: self.add_data.add_course())
-        self.ui.pushButton_addSubject.clicked.connect(lambda: self.add_data.add_subject())
-        self.ui.pushButton_addBlock.clicked.connect(lambda: self.add_data.add_block())
-        self.ui.pushButton_addRoom.clicked.connect(lambda: self.add_data.add("room"))
-
-    def nav_view(self, button):
-        if button == "Student":
-            self.ui.comboBox_view.setCurrentText("Student")
-            self.ui.stackedWidget_pages.setCurrentIndex(0)
-            self.page_view()
-        elif button == "Teacher":
-            self.ui.comboBox_view.setCurrentText("Teacher")
-            self.ui.stackedWidget_pages.setCurrentIndex(0)
-            self.page_view()
+    # Setup Add Buttons
+    def setup_add_buttons(self):
+        add_buttons = {
+            self.ui.pushButton_addStudent: self.add_data.add_student,
+            self.ui.pushButton_addTeacher: self.add_data.add_teacher,
+            self.ui.pushButton_addDepartment: self.add_data.add_department,
+            self.ui.pushButton_addCourse: self.add_data.add_course,
+            self.ui.pushButton_addSubject: self.add_data.add_subject,
+            self.ui.pushButton_addBlock: self.add_data.add_block,
+            self.ui.pushButton_addRoom: self.add_data.add_room,
+            self.ui.pushButton_addRoomSched: self.add_data.add_room_sched,
+            self.ui.pushButton_addSubjectSched: self.add_data.add_subject_sched,
+            self.ui.pushButton_enroll: self.enroll.enroll_student,
+        }
+        for button, handler in add_buttons.items():
+            button.clicked.connect(handler)
 
     # View Page
     def page_view(self):
         self.ui.stackedWidget_pages.setCurrentIndex(0)
         self.update_view()
-        self.ui.comboBox_view.currentTextChanged.connect(self.update_view)
 
     def update_view(self):
         combo_value = self.ui.comboBox_view.currentText()
         self.model = self.view_manager.update_view(
             tableView_view=self.ui.tableView_view,
             combo_value=combo_value,
-            page_info_callback=self.page_info if combo_value == "Student" else None,
+            page_info_callback=self.page_info,
         )
 
-    # Info Page
     def page_info(self, index):
-        self.ui.stackedWidget_pages.setCurrentIndex(3)
-
         row = index.row()
-        student_id = self.model.index(row, 0)
-        student_name = self.model.index(row, 1)
-        student_course = self.model.index(row, 2)
-        student_block = self.model.index(row, 3)
+        combo_value = self.ui.comboBox_view.currentText()
 
-        self.ui.label_studentNo.setText(str(self.model.data(student_id)))
-        self.ui.label_name.setText(self.model.data(student_name))
-        self.ui.label_course.setText(self.model.data(student_course))
-        self.ui.label_block.setText(self.model.data(student_block))
+        data_extractors = {
+            "student": (self.info.show_student_info, [0, 1, 2, 3]),
+            "teacher": (self.info.show_teacher_info, [0, 1, 2]),
+            "department": (self.info.show_department_info, [0, 1]),
+            "subject": (self.info.show_subject_info, [0, 1, 2, 3]),
+            "course": (self.info.show_course_info, [0, 1, 2]),
+            "block": (self.info.show_block_info, [0, 1, 2]),
+            "room": (self.info.show_room_info, [0, 1, 2]),
+        }
+
+        if combo_value in data_extractors:
+            show_function, columns = data_extractors[combo_value]
+            selected_data = tuple(self.model.index(row, col).data() for col in columns)
+            show_function(selected_data)
 
     # Database Connection
     def connect_to_db(self):
@@ -93,18 +130,35 @@ class MainWindow(QMainWindow):
         db.setDatabaseName("sched.db")
         if not db.open():
             print("Database Error:", db.lastError().text())
-            raise Exception("Could not open database.")
+            raise ConnectionError("Could not open database.")
+
+        # Initialize database schema
+        self.initialize_database(db)
         return db
 
-    def clear_formLayout_addForm(self):
-        if self.ui.stackedWidget_pages.currentIndex() == 4:
-            layout = self.ui.formLayout_addForm
-            while layout.count():
-                item = layout.takeAt(0)
-                widget = item.widget()
-                if widget is not None:
-                    widget.setParent(None)
-            self.ui.stackedWidget_pages.setCurrentIndex(2)
+    def initialize_database(self, db):
+        # Read and execute the schema.sql file
+        schema_path = os.path.join(os.path.dirname(__file__), "schema.sql")
+        try:
+            with open(schema_path, "r") as file:
+                schema_sql = file.read()
+
+            # Split the SQL file into individual statements
+            statements = schema_sql.split(";")
+
+            # Execute each statement
+            query = QSqlQuery(db)
+            for statement in statements:
+                if statement.strip() and not query.exec_(statement):
+                    QMessageBox.critical(
+                        self,
+                        "Database Error",
+                        f"Error executing SQL: {query.lastError().text()}\nStatement: {statement}",
+                    )
+        except Exception as e:
+            QMessageBox.critical(
+                self, "Database Error", f"Error initializing database: {str(e)}"
+            )
 
 
 if __name__ == "__main__":

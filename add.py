@@ -1,6 +1,66 @@
 from PyQt5 import QtWidgets
 from PyQt5.QtSql import QSqlQuery
 from PyQt5.QtCore import Qt
+from PyQt5.QtSql import QSqlTableModel
+
+# Table headers configuration
+TABLE_HEADERS = {
+    "tbl_student": {
+        "student_id": "Student ID",
+        "student_name": "Student Name",
+        "course_id": "Course",
+        "year_level": "Year Level",
+        "status": "Status",
+    },
+    "tbl_teacher": {
+        "teacher_id": "Teacher ID",
+        "teacher_name": "Teacher Name",
+        "department_id": "Department",
+    },
+    "tbl_department": {
+        "department_id": "Department ID",
+        "department_name": "Department Name",
+    },
+    "tbl_course": {
+        "course_id": "Course ID",
+        "course_name": "Course Name",
+        "department_id": "Department",
+    },
+    "tbl_subject": {
+        "subject_code": "Subject Code",
+        "subject_name": "Subject Name",
+        "course_id": "Course",
+        "units": "Units",
+    },
+    "tbl_block": {
+        "block_id": "Block ID",
+        "block_name": "Block Name",
+        "course_id": "Course",
+        "department_id": "Department",
+    },
+    "tbl_room": {
+        "room_id": "Room ID",
+        "room_name": "Room Name",
+        "building": "Building",
+    },
+    "tbl_room_sched": {
+        "room_avail_id": "Room Available ID",
+        "room_avail_name": "Room Available Name",
+        "room_id": "Room",
+        "day_available": "Day",
+        "time_start": "Time Start",
+        "time_end": "Time End",
+        "is_available": "Available",
+    },
+    "tbl_subject_sched": {
+        "sched_id": "Schedule ID",
+        "sched_name": "Schedule Name",
+        "subject_code": "Subject Code",
+        "teacher_id": "Teacher",
+        "block_id": "Block",
+        "room_avail_id": "Room Schedule",
+    },
+}
 
 
 class Add:
@@ -8,589 +68,645 @@ class Add:
         self.ui = ui
         self.stackedWidget_pages = stackedWidget_pages
 
-    def add_student(self):
+    def setup_form(self, title, fields, submit_handler, table_name=None):
+        """General method to set up a form dynamically."""
         self.stackedWidget_pages.setCurrentIndex(4)
+        self.ui.label_addForm.setText(title)
 
-        self.ui.label_addForm.setText("Add Student")
-        # 0,0
-        self.label_studID = QtWidgets.QLabel(self.ui.page_addForm)
-        self.label_studID.setObjectName("label_studID")
+        # Clear existing form layout
+        while self.ui.formLayout_addForm.count():
+            item = self.ui.formLayout_addForm.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        # Add fields dynamically
+        self.form_inputs = {}
+        self.field_map = {}
+        for row, (label_text, db_field, field_type, options) in enumerate(fields):
+            label = QtWidgets.QLabel(self.ui.page_addForm)
+            label.setText(label_text)
+            self.ui.formLayout_addForm.setWidget(
+                row, QtWidgets.QFormLayout.LabelRole, label
+            )
+
+            if field_type == "line_edit":
+                field = QtWidgets.QLineEdit(self.ui.page_addForm)
+                field.setPlaceholderText(options.get("placeholder", ""))
+            elif field_type == "combo_box":
+                field = QtWidgets.QComboBox(self.ui.page_addForm)
+                field.addItem(
+                    options.get("default", "Choose..."), None
+                )  # Default item with no user data
+                field.model().item(0).setEnabled(False)
+                # Add items with display text and user data
+                items = options.get("items", [])
+                for item in items:
+                    if isinstance(item, tuple):
+                        display_text, user_data = item
+                        field.addItem(
+                            display_text, user_data
+                        )  # Add display text with user data
+                    else:
+                        field.addItem(item)  # Add item as display text only
+
+                field.setCurrentIndex(0)
+            else:
+                raise ValueError("Unsupported field type")
+
+            self.ui.formLayout_addForm.setWidget(
+                row, QtWidgets.QFormLayout.FieldRole, field
+            )
+            self.form_inputs[label_text] = field
+            self.field_map[label_text] = db_field
+
+        # Add submit button
+        submit_button = QtWidgets.QPushButton(self.ui.page_addForm)
+        submit_button.setText("Submit")
+        submit_button.clicked.connect(submit_handler)
         self.ui.formLayout_addForm.setWidget(
-            0, QtWidgets.QFormLayout.LabelRole, self.label_studID
+            len(fields), QtWidgets.QFormLayout.SpanningRole, submit_button
         )
-        self.label_studID.setText("Student ID: ")
-        self.lineEdit_studID = QtWidgets.QLineEdit(self.ui.page_addForm)
-        self.lineEdit_studID.setObjectName("lineEdit_studID")
+
+        table_view = QtWidgets.QTableView(self.ui.page_addForm)
         self.ui.formLayout_addForm.setWidget(
-            0, QtWidgets.QFormLayout.FieldRole, self.lineEdit_studID
+            len(fields) + 1, QtWidgets.QFormLayout.SpanningRole, table_view
         )
-        self.lineEdit_studID.setPlaceholderText("Enter Student ID...")
-        self.lineEdit_studID.setText("")
-        # 1,0
-        self.label_studName = QtWidgets.QLabel(self.ui.page_addForm)
-        self.label_studName.setObjectName("label_studName")
-        self.ui.formLayout_addForm.setWidget(
-            1, QtWidgets.QFormLayout.LabelRole, self.label_studName
+        self.table_view = table_view
+
+        # Show current table data if table_name is provided
+        if table_name:
+            model = QSqlTableModel(self.ui.page_addForm)
+            model.setTable(table_name)
+
+            # Set custom headers if available
+            if table_name in TABLE_HEADERS:
+                for col, header in TABLE_HEADERS[table_name].items():
+                    model.setHeaderData(model.fieldIndex(col), Qt.Horizontal, header)
+
+            model.select()
+            self.table_view.setModel(model)
+            self.table_view.resizeColumnsToContents()
+            self.table_view.resizeRowsToContents()
+            self.table_view.setSortingEnabled(True)
+            model.setSort(-1, Qt.AscendingOrder)
+            model.select()
+            self.table_view.setSelectionBehavior(self.table_view.SelectRows)
+            self.table_view.setEditTriggers(self.table_view.NoEditTriggers)
+            self.table_view.verticalHeader().setVisible(False)
+
+    def add_student(self):
+        query = QSqlQuery()
+        # Query the database to get course names
+        query.exec_("SELECT course_name, course_id FROM tbl_course")
+        course_items = []  # Collect course names from the query results
+        while query.next():
+            display_name = f"{query.value(0)}, ({query.value(1)})"  # course_name
+            user_data = query.value(1)  # course_id
+            course_items.append((display_name, user_data))
+        fields = [
+            (
+                "Student ID:",
+                "student_id",
+                "line_edit",
+                {"placeholder": "Enter Student ID..."},
+            ),
+            (
+                "Student Name:",
+                "student_name",
+                "line_edit",
+                {"placeholder": "Enter Student Name..."},
+            ),
+            (
+                "Course:",
+                "course_id",
+                "combo_box",
+                {"default": "Choose Student Course...", "items": course_items},
+            ),
+            (
+                "Year Level:",
+                "year_level",
+                "combo_box",
+                {"default": "Choose Year Level...", "items": ["1", "2", "3", "4", "5"]},
+            ),
+            (
+                "Status",
+                "status",
+                "combo_box",
+                {
+                    "default": "Choose Student Status...",
+                    "items": ["Regular", "Irregular"],
+                },
+            ),
+        ]
+        self.setup_form(
+            "Add Student", fields, self.submit_student, table_name="tbl_student"
         )
-        self.label_studName.setText("Student Name: ")
-        self.lineEdit_studName = QtWidgets.QLineEdit(self.ui.page_addForm)
-        self.lineEdit_studName.setObjectName("lineEdit_studName")
-        self.ui.formLayout_addForm.setWidget(
-            1, QtWidgets.QFormLayout.FieldRole, self.lineEdit_studName
-        )
-        self.lineEdit_studName.setPlaceholderText("Enter Student Name...")
-        self.lineEdit_studName.setText("")
-        # 2,0
-        self.label_studCourse = QtWidgets.QLabel(self.ui.page_addForm)
-        self.label_studCourse.setObjectName("label_studCourse")
-        self.ui.formLayout_addForm.setWidget(
-            2, QtWidgets.QFormLayout.LabelRole, self.label_studCourse
-        )
-        self.label_studCourse.setText("Course: ")
-        self.comboBox_studCourse = QtWidgets.QComboBox(self.ui.page_addForm)
-        self.comboBox_studCourse.setObjectName("comboBox_studCourse")
-        self.ui.formLayout_addForm.setWidget(
-            2, QtWidgets.QFormLayout.FieldRole, self.comboBox_studCourse
-        )
-        self.comboBox_studCourse.addItem("Choose Student Course...")
-        self.comboBox_studCourse.setCurrentIndex(0)
-        self.comboBox_studCourse.setItemData(0, 0, Qt.UserRole - 1)
-        self.comboBox_studCourse.addItems(["BSIT", "BSCS", "BSIS"])
-        # 3,0
-        self.label_studBlock = QtWidgets.QLabel(self.ui.page_addForm)
-        self.label_studBlock.setObjectName("label_studBlock")
-        self.ui.formLayout_addForm.setWidget(
-            3, QtWidgets.QFormLayout.LabelRole, self.label_studBlock
-        )
-        self.label_studBlock.setText("Block: ")
-        self.comboBox_studBlock = QtWidgets.QComboBox(self.ui.page_addForm)
-        self.comboBox_studBlock.setObjectName("comboBox_studBlock")
-        self.ui.formLayout_addForm.setWidget(
-            3, QtWidgets.QFormLayout.FieldRole, self.comboBox_studBlock
-        )
-        self.comboBox_studBlock.addItem("Choose Student Block...")
-        self.comboBox_studBlock.setCurrentIndex(0)
-        self.comboBox_studBlock.setItemData(0, 0, Qt.UserRole - 1)
-        self.comboBox_studBlock.addItems(["A", "B", "C"])
-        # 4,0
-        self.pushButton_addSubmit = QtWidgets.QPushButton(self.ui.page_addForm)
-        self.pushButton_addSubmit.setObjectName("pushButton_submit")
-        self.pushButton_addSubmit.setText("Submit")
-        self.ui.formLayout_addForm.setWidget(
-            4, QtWidgets.QFormLayout.SpanningRole, self.pushButton_addSubmit
-        )
-        # Connect the submit button to a handler
-        self.pushButton_addSubmit.clicked.connect(self.submit_student)
 
     def add_teacher(self):
-        self.stackedWidget_pages.setCurrentIndex(4)
-
-        self.ui.label_addForm.setText("Add Teacher")
-        # 0,0
-        self.label_teachID = QtWidgets.QLabel(self.ui.page_addForm)
-        self.label_teachID.setObjectName("label_teachID")
-        self.ui.formLayout_addForm.setWidget(
-            0, QtWidgets.QFormLayout.LabelRole, self.label_teachID
+        query = QSqlQuery()
+        # Query the database to get department names
+        query.exec_("SELECT department_name, department_id FROM tbl_department")
+        department_items = []  # Collect department names from the query results
+        while query.next():
+            display_name = f"{query.value(0)}, ({query.value(1)})"  # department_name
+            user_data = query.value(1)  # department_id
+            department_items.append((display_name, user_data))
+        fields = [
+            (
+                "Teacher ID:",
+                "teacher_id",
+                "line_edit",
+                {"placeholder": "Enter Teacher ID..."},
+            ),
+            (
+                "Teacher Name:",
+                "teacher_name",
+                "line_edit",
+                {"placeholder": "Enter Teacher Name..."},
+            ),
+            (
+                "Department:",
+                "department_id",
+                "combo_box",
+                {"default": "Choose Department...", "items": department_items},
+            ),
+        ]
+        self.setup_form(
+            "Add Teacher", fields, self.submit_teacher, table_name="tbl_teacher"
         )
-        self.label_teachID.setText("Teacher ID: ")
-        self.lineEdit_teachID = QtWidgets.QLineEdit(self.ui.page_addForm)
-        self.lineEdit_teachID.setObjectName("lineEdit_teachID")
-        self.ui.formLayout_addForm.setWidget(
-            0, QtWidgets.QFormLayout.FieldRole, self.lineEdit_teachID
-        )
-        self.lineEdit_teachID.setPlaceholderText("Enter Teacher ID...")
-        self.lineEdit_teachID.setText("")
-        # 1,0
-        self.label_teachName = QtWidgets.QLabel(self.ui.page_addForm)
-        self.label_teachName.setObjectName("label_label_teachName")
-        self.ui.formLayout_addForm.setWidget(
-            1, QtWidgets.QFormLayout.LabelRole, self.label_teachName
-        )
-        self.label_teachName.setText("Teacher Name: ")
-        self.lineEdit_teachName = QtWidgets.QLineEdit(self.ui.page_addForm)
-        self.lineEdit_teachName.setObjectName("lineEdit_teachName")
-        self.ui.formLayout_addForm.setWidget(
-            1, QtWidgets.QFormLayout.FieldRole, self.lineEdit_teachName
-        )
-        self.lineEdit_teachName.setPlaceholderText("Enter Teacher Name...")
-        self.lineEdit_teachName.setText("")
-        # 2,0
-        self.label_teachDept = QtWidgets.QLabel(self.ui.page_addForm)
-        self.label_teachDept.setObjectName("label_teachDept")
-        self.ui.formLayout_addForm.setWidget(
-            2, QtWidgets.QFormLayout.LabelRole, self.label_teachDept
-        )
-        self.label_teachDept.setText("Department: ")
-        self.comboBox_teachDept = QtWidgets.QComboBox(self.ui.page_addForm)
-        self.comboBox_teachDept.setObjectName("comboBox_teachDept")
-        self.ui.formLayout_addForm.setWidget(
-            2, QtWidgets.QFormLayout.FieldRole, self.comboBox_teachDept
-        )
-        self.comboBox_teachDept.addItem("Choose Department...")
-        self.comboBox_teachDept.setCurrentIndex(0)
-        self.comboBox_teachDept.setItemData(0, 0, Qt.UserRole - 1)
-        self.comboBox_teachDept.addItems(["CASE", "CBMA", "CEAFA", "CHS"])
-        # 3,0
-        self.pushButton_addSubmit = QtWidgets.QPushButton(self.ui.page_addForm)
-        self.pushButton_addSubmit.setObjectName("pushButton_submit")
-        self.pushButton_addSubmit.setText("Submit")
-        self.ui.formLayout_addForm.setWidget(
-            3, QtWidgets.QFormLayout.SpanningRole, self.pushButton_addSubmit
-        )
-        # Connect the submit button to a handler
-        self.pushButton_addSubmit.clicked.connect(self.submit_teacher)
 
     def add_department(self):
-        self.stackedWidget_pages.setCurrentIndex(4)
-
-        self.ui.label_addForm.setText("Add Department")
-        # 0,0
-        self.label_deptID = QtWidgets.QLabel(self.ui.page_addForm)
-        self.label_deptID.setObjectName("label_deptID")
-        self.ui.formLayout_addForm.setWidget(
-            0, QtWidgets.QFormLayout.LabelRole, self.label_deptID
+        fields = [
+            (
+                "Department ID:",
+                "department_id",
+                "line_edit",
+                {"placeholder": "Enter Department ID..."},
+            ),
+            (
+                "Department Name:",
+                "department_name",
+                "line_edit",
+                {"placeholder": "Enter Department Name..."},
+            ),
+        ]
+        self.setup_form(
+            "Add Department",
+            fields,
+            self.submit_department,
+            table_name="tbl_department",
         )
-        self.label_deptID.setText("Department ID: ")
-        self.lineEdit_deptID = QtWidgets.QLineEdit(self.ui.page_addForm)
-        self.lineEdit_deptID.setObjectName("lineEdit_deptID")
-        self.ui.formLayout_addForm.setWidget(
-            0, QtWidgets.QFormLayout.FieldRole, self.lineEdit_deptID
-        )
-        self.lineEdit_deptID.setPlaceholderText("Enter Department ID...")
-        self.lineEdit_deptID.setText("")
-        # 1,0
-        self.label_deptName = QtWidgets.QLabel(self.ui.page_addForm)
-        self.label_deptName.setObjectName("label_deptName")
-        self.ui.formLayout_addForm.setWidget(
-            1, QtWidgets.QFormLayout.LabelRole, self.label_deptName
-        )
-        self.label_deptName.setText("Department Name: ")
-        self.lineEdit_deptName = QtWidgets.QLineEdit(self.ui.page_addForm)
-        self.lineEdit_deptName.setObjectName("lineEdit_deptName")
-        self.ui.formLayout_addForm.setWidget(
-            1, QtWidgets.QFormLayout.FieldRole, self.lineEdit_deptName
-        )
-        self.lineEdit_deptName.setPlaceholderText("Enter Department Name...")
-        self.lineEdit_deptName.setText("")
-        # 2,0
-        self.pushButton_addSubmit = QtWidgets.QPushButton(self.ui.page_addForm)
-        self.pushButton_addSubmit.setObjectName("pushButton_submit")
-        self.pushButton_addSubmit.setText("Submit")
-        self.ui.formLayout_addForm.setWidget(
-            3, QtWidgets.QFormLayout.SpanningRole, self.pushButton_addSubmit
-        )
-        # Connect the submit button to a handler
-        self.pushButton_addSubmit.clicked.connect(self.submit_department)
 
     def add_course(self):
-        self.stackedWidget_pages.setCurrentIndex(4)
-
-        self.ui.label_addForm.setText("Add Course")
-        # 0,0
-        self.label_courseID = QtWidgets.QLabel(self.ui.page_addForm)
-        self.label_courseID.setObjectName("label_courseID")
-        self.ui.formLayout_addForm.setWidget(
-            0, QtWidgets.QFormLayout.LabelRole, self.label_courseID
+        query = QSqlQuery()
+        # Query the database to get department names
+        query.exec_("SELECT department_name, department_id FROM tbl_department")
+        department_items = []  # Collect department names from the query results
+        while query.next():
+            display_name = f"{query.value(0)}, ({query.value(1)})"  # department_name
+            user_data = query.value(1)  # department_id
+            department_items.append((display_name, user_data))
+        fields = [
+            (
+                "Course ID:",
+                "course_id",
+                "line_edit",
+                {"placeholder": "Enter Course ID..."},
+            ),
+            (
+                "Course Name:",
+                "course_name",
+                "line_edit",
+                {"placeholder": "Enter Course Name..."},
+            ),
+            (
+                "Department:",
+                "department_id",
+                "combo_box",
+                {"default": "Choose Department...", "items": department_items},
+            ),
+        ]
+        self.setup_form(
+            "Add Course", fields, self.submit_course, table_name="tbl_course"
         )
-        self.label_courseID.setText("Course ID: ")
-        self.lineEdit_courseID = QtWidgets.QLineEdit(self.ui.page_addForm)
-        self.lineEdit_courseID.setObjectName("lineEdit_courseID")
-        self.ui.formLayout_addForm.setWidget(
-            0, QtWidgets.QFormLayout.FieldRole, self.lineEdit_courseID
-        )
-        self.lineEdit_courseID.setPlaceholderText("Enter Course ID...")
-        self.lineEdit_courseID.setText("")
-        # 1,0
-        self.label_courseName = QtWidgets.QLabel(self.ui.page_addForm)
-        self.label_courseName.setObjectName("label_courseID")
-        self.ui.formLayout_addForm.setWidget(
-            1, QtWidgets.QFormLayout.LabelRole, self.label_courseName
-        )
-        self.label_courseName.setText("Course Name: ")
-        self.label_courseName = QtWidgets.QLineEdit(self.ui.page_addForm)
-        self.label_courseName.setObjectName("label_courseName")
-        self.ui.formLayout_addForm.setWidget(
-            1, QtWidgets.QFormLayout.FieldRole, self.label_courseName
-        )
-        self.label_courseName.setPlaceholderText("Enter Course Name...")
-        self.label_courseName.setText("")
-        # 2,0
-        self.label_courseDept = QtWidgets.QLabel(self.ui.page_addForm)
-        self.label_courseDept.setObjectName("label_courseDep")
-        self.ui.formLayout_addForm.setWidget(
-            2, QtWidgets.QFormLayout.LabelRole, self.label_courseDept
-        )
-        self.label_courseDept.setText("Department: ")
-        self.comboBox_courseDept = QtWidgets.QComboBox(self.ui.page_addForm)
-        self.comboBox_courseDept.setObjectName("comboBox_courseDept")
-        self.ui.formLayout_addForm.setWidget(
-            2, QtWidgets.QFormLayout.FieldRole, self.comboBox_courseDept
-        )
-        self.comboBox_courseDept.addItem("Choose Department...")
-        self.comboBox_courseDept.setCurrentIndex(0)
-        self.comboBox_courseDept.setItemData(0, 0, Qt.UserRole - 1)
-        self.comboBox_courseDept.addItems(["CASE", "CBMA", "CEAFA", "CHS"])
-        # 3,0
-        self.pushButton_addSubmit = QtWidgets.QPushButton(self.ui.page_addForm)
-        self.pushButton_addSubmit.setObjectName("pushButton_submit")
-        self.pushButton_addSubmit.setText("Submit")
-        self.ui.formLayout_addForm.setWidget(
-            3, QtWidgets.QFormLayout.SpanningRole, self.pushButton_addSubmit
-        )
-        # Connect the submit button to a handler
-        self.pushButton_addSubmit.clicked.connect(self.submit_course)
 
     def add_subject(self):
-        self.stackedWidget_pages.setCurrentIndex(4)
-
-        self.ui.label_addForm.setText("Add Subject")
-        # 0,0
-        self.label_subjectCode = QtWidgets.QLabel(self.ui.page_addForm)
-        self.label_subjectCode.setObjectName("label_subjectCode")
-        self.ui.formLayout_addForm.setWidget(
-            0, QtWidgets.QFormLayout.LabelRole, self.label_subjectCode
+        query = QSqlQuery()
+        # Query the database to get course names
+        query.exec_("SELECT course_name, course_id FROM tbl_course")
+        course_items = []  # Collect course names from the query results
+        while query.next():
+            display_name = f"{query.value(0)}, ({query.value(1)})"  # course_name
+            user_data = query.value(1)  # course_id
+            course_items.append((display_name, user_data))
+        fields = [
+            (
+                "Subject Code:",
+                "subject_code",
+                "line_edit",
+                {"placeholder": "Enter Subject Code..."},
+            ),
+            (
+                "Subject Name:",
+                "subject_name",
+                "line_edit",
+                {"placeholder": "Enter Subject Name..."},
+            ),
+            (
+                "Course:",
+                "course_id",
+                "combo_box",
+                {"default": "Choose Course...", "items": course_items},
+            ),
+            (
+                "Units:",
+                "units",
+                "combo_box",
+                {"default": "Choose Subject Units...", "items": ["1", "2", "3"]},
+            ),
+        ]
+        self.setup_form(
+            "Add Subject", fields, self.submit_subject, table_name="tbl_subject"
         )
-        self.label_subjectCode.setText("Subject Code: ")
-        self.lineEdit_subjectCode = QtWidgets.QLineEdit(self.ui.page_addForm)
-        self.lineEdit_subjectCode.setObjectName("lineEdit_subjectCode")
-        self.ui.formLayout_addForm.setWidget(
-            0, QtWidgets.QFormLayout.FieldRole, self.lineEdit_subjectCode
-        )
-        self.lineEdit_subjectCode.setPlaceholderText("Enter Subject Code...")
-        self.lineEdit_subjectCode.setText("")
-        # 1,0
-        self.label_subjectName = QtWidgets.QLabel(self.ui.page_addForm)
-        self.label_subjectName.setObjectName("label_subjectName")
-        self.ui.formLayout_addForm.setWidget(
-            1, QtWidgets.QFormLayout.LabelRole, self.label_subjectName
-        )
-        self.label_subjectName.setText("Subject Name: ")
-        self.lineEdit_subjectName = QtWidgets.QLineEdit(self.ui.page_addForm)
-        self.lineEdit_subjectName.setObjectName("lineEdit_subjectName")
-        self.ui.formLayout_addForm.setWidget(
-            1, QtWidgets.QFormLayout.FieldRole, self.lineEdit_subjectName
-        )
-        self.lineEdit_subjectName.setPlaceholderText("Enter Subject Name...")
-        self.lineEdit_subjectName.setText("")
-        # 2,0
-        self.label_subjectCourse = QtWidgets.QLabel(self.ui.page_addForm)
-        self.label_subjectCourse.setObjectName("label_subjectCourse")
-        self.ui.formLayout_addForm.setWidget(
-            2, QtWidgets.QFormLayout.LabelRole, self.label_subjectCourse
-        )
-        self.label_subjectCourse.setText("Course: ")
-        self.comboBox_subjectCourse = QtWidgets.QComboBox(self.ui.page_addForm)
-        self.comboBox_subjectCourse.setObjectName("comboBox_subjectCourse")
-        self.ui.formLayout_addForm.setWidget(
-            2, QtWidgets.QFormLayout.FieldRole, self.comboBox_subjectCourse
-        )
-        self.comboBox_subjectCourse.addItem("Choose Course...")
-        self.comboBox_subjectCourse.setCurrentIndex(0)
-        self.comboBox_subjectCourse.setItemData(0, 0, Qt.UserRole - 1)
-        self.comboBox_subjectCourse.addItems(["BSCS"])
-        # 3,0
-        self.label_subjectUnits = QtWidgets.QLabel(self.ui.page_addForm)
-        self.label_subjectUnits.setObjectName("label_subjectUnits")
-        self.ui.formLayout_addForm.setWidget(
-            3, QtWidgets.QFormLayout.LabelRole, self.label_subjectUnits
-        )
-        self.label_subjectUnits.setText("Course: ")
-        self.comboBox_subjectUnits = QtWidgets.QComboBox(self.ui.page_addForm)
-        self.comboBox_subjectUnits.setObjectName("comboBox_subjectUnits")
-        self.ui.formLayout_addForm.setWidget(
-            3, QtWidgets.QFormLayout.FieldRole, self.comboBox_subjectUnits
-        )
-        self.comboBox_subjectUnits.addItem("Choose Subject Units...")
-        self.comboBox_subjectUnits.setCurrentIndex(0)
-        self.comboBox_subjectUnits.setItemData(0, 0, Qt.UserRole - 1)
-        self.comboBox_subjectUnits.addItems(["1", "2", "3"])
-        # 4,0
-        self.pushButton_addSubmit = QtWidgets.QPushButton(self.ui.page_addForm)
-        self.pushButton_addSubmit.setObjectName("pushButton_submit")
-        self.pushButton_addSubmit.setText("Submit")
-        self.ui.formLayout_addForm.setWidget(
-            4, QtWidgets.QFormLayout.SpanningRole, self.pushButton_addSubmit
-        )
-        # Connect the submit button to a handler
-        self.pushButton_addSubmit.clicked.connect(self.submit_course)
 
     def add_block(self):
-        self.stackedWidget_pages.setCurrentIndex(4)
+        query = QSqlQuery()
+        # Query the database to get course names
+        query.exec_("SELECT course_name, course_id FROM tbl_course")
+        course_items = []  # Collect course names from the query results
+        while query.next():
+            display_name = f"{query.value(0)}, ({query.value(1)})"  # course_name
+            user_data = query.value(1)  # course_id
+            course_items.append((display_name, user_data))
+        query.exec_("SELECT department_name, department_id FROM tbl_department")
+        department_items = []  # Collect department names from the query results
+        while query.next():
+            display_name = f"{query.value(0)}, ({query.value(1)})"  # department_name
+            user_data = query.value(1)  # department_id
+            department_items.append((display_name, user_data))
+        fields = [
+            (
+                "Block ID:",
+                "block_id",
+                "line_edit",
+                {"placeholder": "Enter Block ID..."},
+            ),
+            (
+                "Block Name:",
+                "block_name",
+                "line_edit",
+                {"placeholder": "Enter Block Name..."},
+            ),
+            (
+                "Course:",
+                "course_id",
+                "combo_box",
+                {"default": "Choose Course...", "items": course_items},
+            ),
+            (
+                "Department:",
+                "department_id",
+                "combo_box",
+                {"default": "Choose Department...", "items": department_items},
+            ),
+        ]
+        self.setup_form("Add Block", fields, self.submit_block, table_name="tbl_block")
 
-        self.ui.label_addForm.setText("Add Block")
-        # 0,0
-        self.label_blockID = QtWidgets.QLabel(self.ui.page_addForm)
-        self.label_blockID.setObjectName("label_blockID")
-        self.ui.formLayout_addForm.setWidget(
-            0, QtWidgets.QFormLayout.LabelRole, self.label_blockID
+    def add_room(self):
+        fields = [
+            (
+                "Room ID:",
+                "room_id",
+                "line_edit",
+                {"placeholder": "Enter Room ID..."},
+            ),
+            (
+                "Room Name:",
+                "room_name",
+                "line_edit",
+                {"placeholder": "Enter Room Name..."},
+            ),
+            (
+                "Building:",
+                "building",
+                "line_edit",
+                {"placeholder": "Enter Building Name..."},
+            ),
+        ]
+        self.setup_form("Add Room", fields, self.submit_room, table_name="tbl_room")
+
+    def add_room_sched(self):
+        query = QSqlQuery()
+        # Query the database to get room names
+        query.exec_("SELECT room_name, room_id, building FROM tbl_room")
+        room_items = []  # Collect department names from the query results
+        while query.next():
+            display_name = f"{query.value(0)} - {query.value(2)}"  # room_name
+            user_data = query.value(1)  # room_id
+            room_items.append((display_name, user_data))
+        fields = [
+            (
+                "Room:",
+                "room_id",
+                "combo_box",
+                {"default": "Choose Room...", "items": room_items},
+            ),
+            (
+                "Day:",
+                "day_available",
+                "combo_box",
+                {
+                    "default": "Choose Day...",
+                    "items": [
+                        "Monday",
+                        "Tuesday",
+                        "Wednesday",
+                        "Thursday",
+                        "Friday",
+                        "Saturday",
+                    ],
+                },
+            ),
+            (
+                "Time Start:",
+                "time_start",
+                "combo_box",
+                {
+                    "default": "Choose Time Start...",
+                    "items": [
+                        "7:00 AM",
+                        "9:00 AM",
+                        "11:00 AM",
+                        "1:00 PM",
+                        "3:00 PM",
+                        "5:00 PM",
+                    ],
+                },
+            ),
+            (
+                "Time End:",
+                "time_end",
+                "combo_box",
+                {
+                    "default": "Choose Time End...",
+                    "items": [
+                        "9:00 AM",
+                        "11:00 AM",
+                        "1:00 PM",
+                        "3:00 PM",
+                        "5:00 PM",
+                        "7:00 PM",
+                    ],
+                },
+            ),
+        ]
+        self.setup_form(
+            "Add Room", fields, self.submit_room_sched, table_name="tbl_room_sched"
         )
-        self.label_blockID.setText("Block ID: ")
-        self.lineEdit_blockID = QtWidgets.QLineEdit(self.ui.page_addForm)
-        self.lineEdit_blockID.setObjectName("lineEdit_blockID")
-        self.ui.formLayout_addForm.setWidget(
-            0, QtWidgets.QFormLayout.FieldRole, self.lineEdit_blockID
+
+    def add_subject_sched(self):
+        query = QSqlQuery()
+        # Query the database to get subject names
+        query.exec_("SELECT subject_code, subject_name FROM tbl_subject")
+        subject_items = []  # Collect subject names from the query results
+        while query.next():
+            display_name = f"{query.value(0)}, ({query.value(1)})"  # subject_name
+            user_data = query.value(0)  # subject_id
+            subject_items.append((display_name, user_data))
+        # Query the database to get teacher names
+        query.exec_("SELECT teacher_name, teacher_id, department_id FROM tbl_teacher")
+        teacher_items = []  # Collect teacher names from the query results
+        while query.next():
+            display_name = f"{query.value(0)} - ({query.value(2)})"  # teacher_name
+            user_data = query.value(1)  # teacher_id
+            teacher_items.append((display_name, user_data))
+        # Query the database to get block names
+        query.exec_(
+            "SELECT block_id, block_name, course_id, department_id FROM tbl_block"
         )
-        self.lineEdit_blockID.setPlaceholderText("Enter Block ID...")
-        self.lineEdit_blockID.setText("")
-        # 1,0
-        self.label_blockName = QtWidgets.QLabel(self.ui.page_addForm)
-        self.label_blockName.setObjectName("label_blockName")
-        self.ui.formLayout_addForm.setWidget(
-            1, QtWidgets.QFormLayout.LabelRole, self.label_blockName
+        block_items = []  # Collect block names from the query results
+        while query.next():
+            display_name = f"{query.value(1)} - ({query.value(2)} - {query.value(3)})"  # block_name
+            user_data = query.value(0)  # block_id
+            block_items.append((display_name, user_data))
+        # Query the database to get room names
+        query.exec_(
+            "SELECT room_avail_id, room_id, day_available, time_start, time_end, is_available FROM tbl_room_sched WHERE is_available = 1"
         )
-        self.label_blockName.setText("Block Name: ")
-        self.lineEdit_blockName = QtWidgets.QLineEdit(self.ui.page_addForm)
-        self.lineEdit_blockName.setObjectName("lineEdit_blockName")
-        self.ui.formLayout_addForm.setWidget(
-            1, QtWidgets.QFormLayout.FieldRole, self.lineEdit_blockName
+        room_avail_items = []  # Collect room names from the query results
+        while query.next():
+            display_name = f"{query.value(1)} - {query.value(2)} - {query.value(3)} - {query.value(4)}"  # room_name
+            user_data = query.value(0)  # room_id
+            room_avail_items.append((display_name, user_data))
+        fields = [
+            (
+                "Subject Code:",
+                "subject_code",
+                "combo_box",
+                {"default": "Enter Subject Code...", "items": subject_items},
+            ),
+            (
+                "Teacher:",
+                "teacher_id",
+                "combo_box",
+                {"default": "Choose Teacher...", "items": teacher_items},
+            ),
+            (
+                "Block:",
+                "block_id",
+                "combo_box",
+                {"default": "Choose Block...", "items": block_items},
+            ),
+            (
+                "Room:",
+                "room_avail_id",
+                "combo_box",
+                {"default": "Choose Room...", "items": room_avail_items},
+            ),
+        ]
+        self.setup_form(
+            "Add Subject Sched",
+            fields,
+            self.submit_subject_sched,
+            table_name="tbl_subject_sched",
         )
-        self.lineEdit_blockName.setPlaceholderText("Enter Block Name...")
-        self.lineEdit_blockName.setText("")
-        # 2,0
-        self.label_blockCourse = QtWidgets.QLabel(self.ui.page_addForm)
-        self.label_blockCourse.setObjectName("label_blockCourse")
-        self.ui.formLayout_addForm.setWidget(
-            2, QtWidgets.QFormLayout.LabelRole, self.label_blockCourse
+
+    def submit_form(self, table_name, fields, message):
+        """General method to handle form submission."""
+        values = {}
+        for label, field in self.form_inputs.items():
+            if isinstance(field, QtWidgets.QLineEdit):
+                values[self.field_map[label]] = field.text().strip()
+            elif isinstance(field, QtWidgets.QComboBox):
+                values[self.field_map[label]] = (
+                    field.currentData()
+                    if field.currentData() is not None
+                    else field.currentText()
+                )
+
+        # Add is_available if needed
+        if table_name == "tbl_room_sched":
+            values["is_available"] = 1
+            # Create room_avail_name by combining room_id, day, and time information
+            room_id = values["room_id"]
+            day = values["day_available"]
+            time_start = values["time_start"]
+            time_end = values["time_end"]
+            values["room_avail_name"] = f"{room_id} - {day} ({time_start}-{time_end})"
+
+        if table_name == "tbl_subject_sched":
+            # Query to get teacher name
+            query = QSqlQuery()
+            query.prepare("SELECT teacher_name FROM tbl_teacher WHERE teacher_id = ?")
+            query.addBindValue(values["teacher_id"])
+            query.exec_()
+            teacher_name = query.value(0) if query.next() else values["teacher_id"]
+
+            # Query to get block name
+            query.prepare("SELECT block_name FROM tbl_block WHERE block_id = ?")
+            query.addBindValue(values["block_id"])
+            query.exec_()
+            block_name = query.value(0) if query.next() else values["block_id"]
+
+            # Query to get room availability name
+            query.prepare(
+                "SELECT room_avail_name FROM tbl_room_sched WHERE room_avail_id = ?"
+            )
+            query.addBindValue(values["room_avail_id"])
+            query.exec_()
+            room_avail_name = (
+                query.value(0) if query.next() else values["room_avail_id"]
+            )
+
+            # Create sched_name using descriptive names
+            values["sched_name"] = (
+                f"{values['subject_code']} - ({room_avail_name}) ({teacher_name}-({block_name}))"
+            )
+
+            update_query = QSqlQuery()
+            update_query.prepare(
+                "UPDATE tbl_room_sched SET is_available = 0 WHERE room_avail_id = ?"
+            )
+            update_query.addBindValue(values["room_avail_id"])
+            update_query.exec_()
+
+        # Validate inputs
+        for key, value in values.items():
+            if not value or (isinstance(value, str) and "Choose" in value):
+                QtWidgets.QMessageBox.warning(
+                    None, "Input Error", "Please fill in all fields correctly."
+                )
+                return
+
+        # Map labels to database fields
+        mapped_values = [values[field] for field in fields]
+
+        print(fields)
+        print(mapped_values)
+
+        # Prepare and execute query
+        query = QSqlQuery()
+        placeholders = ", ".join(["?"] * len(fields))
+        query.prepare(
+            f"INSERT INTO {table_name} ({', '.join(fields)}) VALUES ({placeholders})"
         )
-        self.label_blockCourse.setText("Course: ")
-        self.comboBox_blockCourse = QtWidgets.QComboBox(self.ui.page_addForm)
-        self.comboBox_blockCourse.setObjectName("comboBox_blockCourse")
-        self.ui.formLayout_addForm.setWidget(
-            2, QtWidgets.QFormLayout.FieldRole, self.comboBox_blockCourse
-        )
-        self.comboBox_blockCourse.addItem("Choose Course...")
-        self.comboBox_blockCourse.setCurrentIndex(0)
-        self.comboBox_blockCourse.setItemData(0, 0, Qt.UserRole - 1)
-        self.comboBox_blockCourse.addItems(["BSCS"])
-        # 3,0
-        self.pushButton_addSubmit = QtWidgets.QPushButton(self.ui.page_addForm)
-        self.pushButton_addSubmit.setObjectName("pushButton_submit")
-        self.pushButton_addSubmit.setText("Submit")
-        self.ui.formLayout_addForm.setWidget(
-            3, QtWidgets.QFormLayout.SpanningRole, self.pushButton_addSubmit
-        )
-        # Connect the submit button to a handler
-        self.pushButton_addSubmit.clicked.connect(self.submit_block)
+        for value in mapped_values:
+            query.addBindValue(value)
+
+        if query.exec_():
+            # Construct success message with all inputted data
+            success_message = f"{message} added successfully!\n\n"
+            for key, value in values.items():
+                success_message += f"{key.replace('_', ' ').upper()}: {value}\n"
+
+            QtWidgets.QMessageBox.information(None, "Success", success_message)
+
+            # Call the appropriate setup_form method based on table_name
+            if table_name == "tbl_student":
+                self.add_student()
+            elif table_name == "tbl_teacher":
+                self.add_teacher()
+            elif table_name == "tbl_department":
+                self.add_department()
+            elif table_name == "tbl_course":
+                self.add_course()
+            elif table_name == "tbl_subject":
+                self.add_subject()
+            elif table_name == "tbl_block":
+                self.add_block()
+            elif table_name == "tbl_room":
+                self.add_room()
+            elif table_name == "tbl_room_sched":
+                self.add_room_sched()
+            elif table_name == "tbl_subject_sched":
+                self.add_subject_sched()
+
+        else:
+            QtWidgets.QMessageBox.critical(
+                None, "Database Error", query.lastError().text()
+            )
 
     def submit_student(self):
-        student_id = self.lineEdit_studID.text().strip()
-        student_name = self.lineEdit_studName.text().strip()
-        student_course = self.comboBox_studCourse.currentText()
-        student_block = self.comboBox_studBlock.currentText()
-
-        if (
-            not student_id
-            or not student_name
-            or student_course == "Choose Student Course..."
-            or student_block == "Choose Student Block..."
-        ):
-            QtWidgets.QMessageBox.warning(
-                None, "Input Error", "Please fill in all fields correctly."
-            )
-            return
-
-        query = QSqlQuery()
-        query.prepare(
-            """
-            INSERT INTO tbl_student (student_id, student_name, course_id, block_id)
-            VALUES (?, ?, ?, ?)
-        """
+        self.submit_form(
+            "tbl_student",
+            ["student_id", "student_name", "course_id", "year_level", "status"],
+            "Student",
         )
-        query.addBindValue(student_id)
-        query.addBindValue(student_name)
-        query.addBindValue(student_course)
-        query.addBindValue(student_block)
-
-        if query.exec_():
-            QtWidgets.QMessageBox.information(
-                None, "Success", "Student added successfully!"
-            )
-            # Clear fields
-            self.lineEdit_studID.clear()
-            self.lineEdit_studName.clear()
-            self.comboBox_studCourse.setCurrentIndex(0)
-            self.comboBox_studBlock.setCurrentIndex(0)
-        else:
-            QtWidgets.QMessageBox.critical(
-                None, "Database Error", query.lastError().text()
-            )
 
     def submit_teacher(self):
-        teacher_id = self.lineEdit_teachID.text().strip()
-        teacher_name = self.lineEdit_teachName.text().strip()
-        teacher_dept = self.comboBox_teachDept.currentText()
-
-        if not teacher_id or not teacher_name or teacher_dept == "Choose Department...":
-            QtWidgets.QMessageBox.warning(
-                None, "Input Error", "Please fill in all fields correctly."
-            )
-            return
-
-        query = QSqlQuery()
-        query.prepare(
-            """
-            INSERT INTO tbl_teacher (teacher_id, teacher_name, department_id)
-            VALUES (?, ?, ?)
-        """
+        self.submit_form(
+            "tbl_teacher", ["teacher_id", "teacher_name", "department_id"], "Teacher"
         )
-        query.addBindValue(teacher_id)
-        query.addBindValue(teacher_name)
-        query.addBindValue(teacher_dept)
-
-        if query.exec_():
-            QtWidgets.QMessageBox.information(
-                None, "Success", "Teacher added successfully!"
-            )
-            # Clear fields
-            self.lineEdit_teachID.clear()
-            self.lineEdit_teachName.clear()
-            self.comboBox_teachDept.setCurrentIndex(0)
-        else:
-            QtWidgets.QMessageBox.critical(
-                None, "Database Error", query.lastError().text()
-            )
 
     def submit_department(self):
-        department_id = self.lineEdit_deptID.text().strip()
-        department_name = self.lineEdit_deptName.text().strip()
-
-        if not department_id or not department_name:
-            QtWidgets.QMessageBox.warning(
-                None, "Input Error", "Please fill in all fields correctly."
-            )
-            return
-
-        query = QSqlQuery()
-        query.prepare(
-            """
-            INSERT INTO tbl_department (department_id, department_name)
-            VALUES (?, ?)
-        """
+        self.submit_form(
+            "tbl_department", ["department_id", "department_name"], "Department"
         )
-        query.addBindValue(department_id)
-        query.addBindValue(department_name)
-
-        if query.exec_():
-            QtWidgets.QMessageBox.information(
-                None, "Success", "Department added successfully!"
-            )
-            # Clear fields
-            self.lineEdit_deptID.clear()
-            self.lineEdit_deptName.clear()
-        else:
-            QtWidgets.QMessageBox.critical(
-                None, "Database Error", query.lastError().text()
-            )
 
     def submit_course(self):
-        course_id = self.lineEdit_courseID.text().strip()
-        course_name = self.label_courseName.text().strip()
-        course_dept = self.comboBox_courseDept.currentText()
-
-        if not course_id or not course_name or course_dept == "Choose Department...":
-            QtWidgets.QMessageBox.warning(
-                None, "Input Error", "Please fill in all fields correctly."
-            )
-            return
-
-        query = QSqlQuery()
-        query.prepare(
-            """
-            INSERT INTO tbl_course (course_id, course_name, department_id)
-            VALUES (?, ?, ?)
-        """
+        self.submit_form(
+            "tbl_course", ["course_id", "course_name", "department_id"], "Course"
         )
-        query.addBindValue(course_id)
-        query.addBindValue(course_name)
-        query.addBindValue(course_dept)
-
-        if query.exec_():
-            QtWidgets.QMessageBox.information(
-                None, "Success", "Course added successfully!"
-            )
-            # Clear fields
-            self.lineEdit_courseID.clear()
-            self.label_courseName.clear()
-            self.comboBox_courseDept.setCurrentIndex(0)
-        else:
-            QtWidgets.QMessageBox.critical(
-                None, "Database Error", query.lastError().text()
-            )
 
     def submit_subject(self):
-        subject_code = self.lineEdit_subjectCode.text().strip()
-        subject_name = self.lineEdit_subjectName.text().strip()
-        subject_course = self.comboBox_subjectCourse.currentText()
-        subject_units = self.comboBox_subjectUnits.currentText()
-
-        if (
-            not subject_code
-            or not subject_name
-            or subject_course == "Choose Course..."
-            or subject_units == "Choose Subject Units..."
-        ):
-            QtWidgets.QMessageBox.warning(
-                None, "Input Error", "Please fill in all fields correctly."
-            )
-            return
-
-        query = QSqlQuery()
-        query.prepare(
-            """
-            INSERT INTO tbl_subject (subject_code, subject_name, course_id, units)
-            VALUES (?, ?, ?, ?)
-        """
+        self.submit_form(
+            "tbl_subject",
+            ["subject_code", "subject_name", "course_id", "units"],
+            "Subject",
         )
-        query.addBindValue(subject_code)
-        query.addBindValue(subject_name)
-        query.addBindValue(subject_course)
-        query.addBindValue(subject_units)
-
-        if query.exec_():
-            QtWidgets.QMessageBox.information(
-                None, "Success", "Subject added successfully!"
-            )
-            # Clear fields
-            self.lineEdit_subjectCode.clear()
-            self.lineEdit_subjectName.clear()
-            self.comboBox_subjectCourse.setCurrentIndex(0)
-            self.comboBox_subjectUnits.setCurrentIndex(0)
-        else:
-            QtWidgets.QMessageBox.critical(
-                None, "Database Error", query.lastError().text()
-            )
 
     def submit_block(self):
-        block_id = self.lineEdit_blockID.text().strip()
-        block_name = self.lineEdit_blockName.text().strip()
-        block_course = self.comboBox_blockCourse.currentText()
-
-        if not block_id or not block_name or block_course == "Choose Course...":
-            QtWidgets.QMessageBox.warning(
-                None, "Input Error", "Please fill in all fields correctly."
-            )
-            return
-
-        query = QSqlQuery()
-        query.prepare(
-            """
-            INSERT INTO tbl_block (block_id, block_name, course_id)
-            VALUES (?, ?, ?)
-        """
+        self.submit_form(
+            "tbl_block",
+            ["block_id", "block_name", "course_id", "department_id"],
+            "Block",
         )
-        query.addBindValue(block_id)
-        query.addBindValue(block_name)
-        query.addBindValue(block_course)
 
-        if query.exec_():
-            QtWidgets.QMessageBox.information(
-                None, "Success", "Block added successfully!"
-            )
-            # Clear fields
-            self.lineEdit_blockID.clear()
-            self.lineEdit_blockName.clear()
-            self.comboBox_blockCourse.setCurrentIndex(0)
-        else:
-            QtWidgets.QMessageBox.critical(
-                None, "Database Error", query.lastError().text()
-            )
+    def submit_room(self):
+        self.submit_form("tbl_room", ["room_id", "room_name", "building"], "Room")
+
+    def submit_room_sched(self):
+        self.submit_form(
+            "tbl_room_sched",
+            [
+                "room_avail_name",
+                "room_id",
+                "day_available",
+                "time_start",
+                "time_end",
+                "is_available",
+            ],
+            "Room Schedule",
+        )
+
+    def submit_subject_sched(self):
+        self.submit_form(
+            "tbl_subject_sched",
+            ["sched_name", "subject_code", "teacher_id", "block_id", "room_avail_id"],
+            "Subject Schedule",
+        )
+
+    def refresh_table_view(self):
+        self.table_view.model().select()
+        self.table_view.resizeColumnsToContents()
+        self.table_view.resizeRowsToContents()

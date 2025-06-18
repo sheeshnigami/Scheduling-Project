@@ -9,37 +9,63 @@ class ViewManager:
 
         # Define configurations in one place
         self.view_config = {
-            "Student": {
+            "student": {
                 "table": "tbl_student",
                 "label": "Student List",
                 "headers": ["Student ID", "Full Name", "Course", "Block"],
             },
-            "Teacher": {
+            "teacher": {
                 "table": "tbl_teacher",
                 "label": "Teacher List",
                 "headers": ["Teacher ID", "Full Name", "Department"],
             },
-            "Department": {
+            "department": {
                 "table": "tbl_department",
                 "label": "Department List",
                 "headers": ["Department ID", "Department Name"],
             },
-            "Subject": {
+            "course": {
+                "table": "tbl_course",
+                "label": "Course List",
+                "headers": ["Course ID", "Course Name", "Department"],
+            },
+            "subject": {
                 "table": "tbl_subject",
                 "label": "Subject List",
                 "headers": ["Subject ID", "Subject Name", "Course", "Units"],
             },
-            "Subject Schedule": {
+            "block": {
+                "table": "tbl_block",
+                "label": "Block List",
+                "headers": ["Block ID", "Block Name", "Course"],
+            },
+            "room": {
+                "table": "tbl_room",
+                "label": "Room List",
+                "headers": ["Room ID", "Room Name", "Building"],
+            },
+            "room schedule": {
+                "table": "tbl_room_sched",
+                "label": "Room Schedule List",
+                "headers": [
+                    "Room Avail ID",
+                    "Room ID",
+                    "Day Available",
+                    "Time Start",
+                    "Time End",
+                    "Is Available?",
+                ],
+            },
+            "subject schedule": {
                 "table": "tbl_subject_sched",
                 "label": "Subject Schedule List",
                 "headers": [
-                    "Subject Sched Code",
-                    "Subject Sched Name",
-                    "Course",
-                    "Teacher",
-                    "Block",
-                    "Room",
-                    "Time",
+                    "Sched ID",
+                    "Sched Name",
+                    "Subject Code",
+                    "Teacher ID",
+                    "Block ID",
+                    "Room Available ID",
                 ],
             },
         }
@@ -73,7 +99,7 @@ class ViewManager:
 
         self.setup_table_view(tableView_view, model)
 
-        if page_info_callback and combo_value == "Student":
+        if page_info_callback and combo_value == "student":
             tableView_view.doubleClicked.connect(page_info_callback)
 
         return model

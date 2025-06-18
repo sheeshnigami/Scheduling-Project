@@ -32,16 +32,16 @@
        </widget>
       </item>
       <item>
-       <widget class="QPushButton" name="pushButton_students">
+       <widget class="QPushButton" name="pushButton_nav_add">
         <property name="text">
-         <string>Students</string>
+         <string>Add</string>
         </property>
        </widget>
       </item>
       <item>
-       <widget class="QPushButton" name="pushButton_teachers">
+       <widget class="QPushButton" name="pushButton_nav_view">
         <property name="text">
-         <string>Teachers</string>
+         <string>View</string>
         </property>
        </widget>
       </item>
@@ -63,7 +63,7 @@
     <item>
      <widget class="QStackedWidget" name="stackedWidget_pages">
       <property name="currentIndex">
-       <number>2</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="page_view">
        <layout class="QHBoxLayout" name="horizontalLayout">
@@ -214,9 +214,23 @@
          </widget>
         </item>
         <item>
-         <widget class="QPushButton" name="pushButton">
+         <widget class="QPushButton" name="pushButton_addRoomSched">
           <property name="text">
            <string>Add Room Schedule</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="pushButton_addSubjectSched">
+          <property name="text">
+           <string>Add Subject Schedule</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="pushButton_enroll">
+          <property name="text">
+           <string>Enroll</string>
           </property>
          </widget>
         </item>
@@ -245,64 +259,7 @@
          </widget>
         </item>
         <item>
-         <layout class="QGridLayout" name="gridLayout_info">
-          <item row="0" column="2">
-           <widget class="QLabel" name="label_3">
-            <property name="text">
-             <string>Course</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="0">
-           <widget class="QLabel" name="label_2">
-            <property name="text">
-             <string>Name</string>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="1">
-           <widget class="QLabel" name="label_studentNo">
-            <property name="text">
-             <string>TextLabel</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="1">
-           <widget class="QLabel" name="label_name">
-            <property name="text">
-             <string>TextLabel</string>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="0">
-           <widget class="QLabel" name="label_1">
-            <property name="text">
-             <string>Student No.</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="2">
-           <widget class="QLabel" name="label_4">
-            <property name="text">
-             <string>Block</string>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="3">
-           <widget class="QLabel" name="label_course">
-            <property name="text">
-             <string>TextLabel</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="3">
-           <widget class="QLabel" name="label_block">
-            <property name="text">
-             <string>TextLabel</string>
-            </property>
-           </widget>
-          </item>
-         </layout>
+         <layout class="QGridLayout" name="gridLayout_info"/>
         </item>
         <item>
          <widget class="QTableView" name="tableView_info"/>
