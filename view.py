@@ -88,8 +88,6 @@ class ViewManager:
             print(f"Warning: No view config found for {combo_value}")
             return None
 
-        self.ui.label_view.setText(config["label"])
-
         model = QSqlTableModel(None, self.db)
         model.setTable(config["table"])
         model.select()

@@ -31,12 +31,14 @@ TABLE_HEADERS = {
         "subject_name": "Subject Name",
         "course_id": "Course",
         "units": "Units",
+        "year_level": "Year Level",
     },
     "tbl_block": {
         "block_id": "Block ID",
         "block_name": "Block Name",
         "course_id": "Course",
         "department_id": "Department",
+        "year_level": "Year Level",
     },
     "tbl_room": {
         "room_id": "Room ID",
@@ -59,6 +61,7 @@ TABLE_HEADERS = {
         "teacher_id": "Teacher",
         "block_id": "Block",
         "room_avail_id": "Room Schedule",
+        "year_level": "Year Level",
     },
 }
 
@@ -160,7 +163,7 @@ class Add:
         query.exec_("SELECT course_name, course_id FROM tbl_course")
         course_items = []  # Collect course names from the query results
         while query.next():
-            display_name = f"{query.value(0)}, ({query.value(1)})"  # course_name
+            display_name = f"{query.value(0)}, {query.value(1)}"  # course_name
             user_data = query.value(1)  # course_id
             course_items.append((display_name, user_data))
         fields = [
@@ -186,7 +189,17 @@ class Add:
                 "Year Level:",
                 "year_level",
                 "combo_box",
-                {"default": "Choose Year Level...", "items": ["1", "2", "3", "4", "5"]},
+                {
+                    "default": "Choose Year Level...",
+                    "items": [
+                        "Grade 11",
+                        "Grade 12",
+                        "1st Year",
+                        "2nd Year",
+                        "3rd Year",
+                        "4th Year",
+                    ],
+                },
             ),
             (
                 "Status",
@@ -208,7 +221,7 @@ class Add:
         query.exec_("SELECT department_name, department_id FROM tbl_department")
         department_items = []  # Collect department names from the query results
         while query.next():
-            display_name = f"{query.value(0)}, ({query.value(1)})"  # department_name
+            display_name = f"{query.value(0)}, {query.value(1)}"  # department_name
             user_data = query.value(1)  # department_id
             department_items.append((display_name, user_data))
         fields = [
@@ -263,7 +276,7 @@ class Add:
         query.exec_("SELECT department_name, department_id FROM tbl_department")
         department_items = []  # Collect department names from the query results
         while query.next():
-            display_name = f"{query.value(0)}, ({query.value(1)})"  # department_name
+            display_name = f"{query.value(0)}, {query.value(1)}"  # department_name
             user_data = query.value(1)  # department_id
             department_items.append((display_name, user_data))
         fields = [
@@ -296,7 +309,7 @@ class Add:
         query.exec_("SELECT course_name, course_id FROM tbl_course")
         course_items = []  # Collect course names from the query results
         while query.next():
-            display_name = f"{query.value(0)}, ({query.value(1)})"  # course_name
+            display_name = f"{query.value(0)}, {query.value(1)}"  # course_name
             user_data = query.value(1)  # course_id
             course_items.append((display_name, user_data))
         fields = [
@@ -324,6 +337,22 @@ class Add:
                 "combo_box",
                 {"default": "Choose Subject Units...", "items": ["1", "2", "3"]},
             ),
+            (
+                "Year Level:",
+                "year_level",
+                "combo_box",
+                {
+                    "default": "Choose Year Level...",
+                    "items": [
+                        "Grade 11",
+                        "Grade 12",
+                        "1st Year",
+                        "2nd Year",
+                        "3rd Year",
+                        "4th Year",
+                    ],
+                },
+            ),
         ]
         self.setup_form(
             "Add Subject", fields, self.submit_subject, table_name="tbl_subject"
@@ -335,13 +364,13 @@ class Add:
         query.exec_("SELECT course_name, course_id FROM tbl_course")
         course_items = []  # Collect course names from the query results
         while query.next():
-            display_name = f"{query.value(0)}, ({query.value(1)})"  # course_name
+            display_name = f"{query.value(0)}, {query.value(1)}"  # course_name
             user_data = query.value(1)  # course_id
             course_items.append((display_name, user_data))
         query.exec_("SELECT department_name, department_id FROM tbl_department")
         department_items = []  # Collect department names from the query results
         while query.next():
-            display_name = f"{query.value(0)}, ({query.value(1)})"  # department_name
+            display_name = f"{query.value(0)}, {query.value(1)}"  # department_name
             user_data = query.value(1)  # department_id
             department_items.append((display_name, user_data))
         fields = [
@@ -368,6 +397,22 @@ class Add:
                 "department_id",
                 "combo_box",
                 {"default": "Choose Department...", "items": department_items},
+            ),
+            (
+                "Year Level:",
+                "year_level",
+                "combo_box",
+                {
+                    "default": "Choose Year Level...",
+                    "items": [
+                        "Grade 11",
+                        "Grade 12",
+                        "1st Year",
+                        "2nd Year",
+                        "3rd Year",
+                        "4th Year",
+                    ],
+                },
             ),
         ]
         self.setup_form("Add Block", fields, self.submit_block, table_name="tbl_block")
@@ -401,7 +446,7 @@ class Add:
         query.exec_("SELECT room_name, room_id, building FROM tbl_room")
         room_items = []  # Collect department names from the query results
         while query.next():
-            display_name = f"{query.value(0)} - {query.value(2)}"  # room_name
+            display_name = f"{query.value(0)}, {query.value(2)}"  # room_name
             user_data = query.value(1)  # room_id
             room_items.append((display_name, user_data))
         fields = [
@@ -466,39 +511,42 @@ class Add:
 
     def add_subject_sched(self):
         query = QSqlQuery()
-        # Query the database to get subject names
-        query.exec_("SELECT subject_code, subject_name FROM tbl_subject")
-        subject_items = []  # Collect subject names from the query results
-        while query.next():
-            display_name = f"{query.value(0)}, ({query.value(1)})"  # subject_name
-            user_data = query.value(0)  # subject_id
-            subject_items.append((display_name, user_data))
+        # Initial empty lists for subject and block
+        subject_items = []
+        block_items = []
         # Query the database to get teacher names
         query.exec_("SELECT teacher_name, teacher_id, department_id FROM tbl_teacher")
         teacher_items = []  # Collect teacher names from the query results
         while query.next():
-            display_name = f"{query.value(0)} - ({query.value(2)})"  # teacher_name
+            display_name = f"{query.value(0)}, ({query.value(2)})"  # teacher_name
             user_data = query.value(1)  # teacher_id
             teacher_items.append((display_name, user_data))
-        # Query the database to get block names
-        query.exec_(
-            "SELECT block_id, block_name, course_id, department_id FROM tbl_block"
-        )
-        block_items = []  # Collect block names from the query results
-        while query.next():
-            display_name = f"{query.value(1)} - ({query.value(2)} - {query.value(3)})"  # block_name
-            user_data = query.value(0)  # block_id
-            block_items.append((display_name, user_data))
         # Query the database to get room names
         query.exec_(
             "SELECT room_avail_id, room_id, day_available, time_start, time_end, is_available FROM tbl_room_sched WHERE is_available = 1"
         )
         room_avail_items = []  # Collect room names from the query results
         while query.next():
-            display_name = f"{query.value(1)} - {query.value(2)} - {query.value(3)} - {query.value(4)}"  # room_name
+            display_name = f"{query.value(1)} - {query.value(2)}, {query.value(3)} - {query.value(4)}"  # room_name
             user_data = query.value(0)  # room_id
             room_avail_items.append((display_name, user_data))
         fields = [
+            (
+                "Year Level:",
+                "year_level",
+                "combo_box",
+                {
+                    "default": "Choose Year Level...",
+                    "items": [
+                        "Grade 11",
+                        "Grade 12",
+                        "1st Year",
+                        "2nd Year",
+                        "3rd Year",
+                        "4th Year",
+                    ],
+                },
+            ),
             (
                 "Subject Code:",
                 "subject_code",
@@ -531,6 +579,58 @@ class Add:
             table_name="tbl_subject_sched",
         )
 
+        # --- Dynamic filtering logic ---
+        year_level_cb = self.form_inputs["Year Level:"]
+        subject_cb = self.form_inputs["Subject Code:"]
+        block_cb = self.form_inputs["Block:"]
+
+        def update_subjects_blocks():
+            year_level = year_level_cb.currentText()
+            # Only update if a valid year level is selected
+            if year_level.startswith("Choose"):
+                # Clear subject and block combo boxes
+                subject_cb.clear()
+                subject_cb.addItem("Enter Subject Code...", None)
+                subject_cb.model().item(0).setEnabled(False)
+                block_cb.clear()
+                block_cb.addItem("Choose Block...", None)
+                block_cb.model().item(0).setEnabled(False)
+                return
+            # Update subject combo box
+            query = QSqlQuery()
+            query.prepare(
+                "SELECT subject_code, subject_name FROM tbl_subject WHERE year_level = ?"
+            )
+            query.addBindValue(year_level)
+            query.exec_()
+            subject_cb.clear()
+            subject_cb.addItem("Enter Subject Code...", None)
+            subject_cb.model().item(0).setEnabled(False)
+            while query.next():
+                display_name = f"{query.value(0)}, ({query.value(1)})"
+                user_data = query.value(0)
+                subject_cb.addItem(display_name, user_data)
+            # Update block combo box
+            query = QSqlQuery()
+            query.prepare(
+                "SELECT block_id, block_name, course_id, department_id FROM tbl_block WHERE year_level = ?"
+            )
+            query.addBindValue(year_level)
+            query.exec_()
+            block_cb.clear()
+            block_cb.addItem("Choose Block...", None)
+            block_cb.model().item(0).setEnabled(False)
+            while query.next():
+                display_name = (
+                    f"{query.value(1)} - ({query.value(2)} - {query.value(3)})"
+                )
+                user_data = query.value(0)
+                block_cb.addItem(display_name, user_data)
+
+        year_level_cb.currentIndexChanged.connect(update_subjects_blocks)
+        # Optionally, call once to initialize if a year is preselected
+        update_subjects_blocks()
+
     def submit_form(self, table_name, fields, message):
         """General method to handle form submission."""
         values = {}
@@ -552,7 +652,7 @@ class Add:
             day = values["day_available"]
             time_start = values["time_start"]
             time_end = values["time_end"]
-            values["room_avail_name"] = f"{room_id} - {day} ({time_start}-{time_end})"
+            values["room_avail_name"] = f"{room_id} - {day}, {time_start}-{time_end})"
 
         if table_name == "tbl_subject_sched":
             # Query to get teacher name
@@ -665,20 +765,22 @@ class Add:
 
     def submit_course(self):
         self.submit_form(
-            "tbl_course", ["course_id", "course_name", "department_id"], "Course"
+            "tbl_course",
+            ["course_id", "course_name", "department_id"],
+            "Course",
         )
 
     def submit_subject(self):
         self.submit_form(
             "tbl_subject",
-            ["subject_code", "subject_name", "course_id", "units"],
+            ["subject_code", "subject_name", "course_id", "units", "year_level"],
             "Subject",
         )
 
     def submit_block(self):
         self.submit_form(
             "tbl_block",
-            ["block_id", "block_name", "course_id", "department_id"],
+            ["block_id", "block_name", "course_id", "department_id", "year_level"],
             "Block",
         )
 

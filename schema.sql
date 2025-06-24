@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS tbl_block (
     block_name TEXT NOT NULL,
     course_id TEXT NOT NULL,
     department_id TEXT NOT NULL,
+    year_level TEXT NOT NULL,
     FOREIGN KEY (course_id) REFERENCES tbl_course(course_id),
     FOREIGN KEY (department_id) REFERENCES tbl_department(department_id)
 );
@@ -58,6 +59,7 @@ CREATE TABLE IF NOT EXISTS tbl_subject (
     subject_name TEXT NOT NULL,
     course_id INT NOT NULL,
     units INTEGER NOT NULL,
+    year_level TEXT NOT NULL,
     FOREIGN KEY (course_id) REFERENCES tbl_course(course_id)
 );
 
@@ -68,6 +70,7 @@ CREATE TABLE IF NOT EXISTS tbl_subject_sched (
     teacher_id TEXT NOT NULL,
     block_id TEXT NOT NULL,
     room_avail_id INTEGER NOT NULL,
+    year_level TEXT NOT NULL,
     FOREIGN KEY (subject_code) REFERENCES tbl_subject(subject_code),
     FOREIGN KEY (teacher_id) REFERENCES tbl_teacher(teacher_id),
     FOREIGN KEY (block_id) REFERENCES tbl_block(block_id),

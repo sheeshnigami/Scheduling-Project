@@ -39,15 +39,15 @@ class MainWindow(QMainWindow):
     def setup_combo_box(self):
         self.ui.comboBox_view.addItems(
             [
-                "student",
-                "teacher",
-                "department",
-                "subject",
-                "course",
-                "block",
-                "room",
-                "room schedule",
-                "subject schedule",
+                "Student List",
+                "Teacher List",
+                "Department List",
+                "Subject List",
+                "Course List",
+                "Block List",
+                "Room List",
+                "Room Schedule List",
+                "Subject Schedule List",
             ]
         )
         self.ui.comboBox_view.currentTextChanged.connect(self.update_view)
@@ -99,15 +99,36 @@ class MainWindow(QMainWindow):
 
     def update_view(self):
         combo_value = self.ui.comboBox_view.currentText()
+        if combo_value == "Student List":
+            update_value = "student"
+        elif combo_value == "Teacher List":
+            update_value = "teacher"
+        elif combo_value == "Department List":
+            update_value = "department"
+        elif combo_value == "Subject List":
+            update_value = "subject"
+        elif combo_value == "Course List":
+            update_value = "course"
+        elif combo_value == "Block List":
+            update_value = "block"
+        elif combo_value == "Room List":
+            update_value = "room"
+        elif combo_value == "Room Schedule List":
+            update_value = "room schedule"
+        elif combo_value == "Subject Schedule List":
+            update_value = "subject schedule"
+
+        self.update_value = update_value
+
         self.model = self.view_manager.update_view(
             tableView_view=self.ui.tableView_view,
-            combo_value=combo_value,
+            combo_value=update_value,
             page_info_callback=self.page_info,
         )
 
     def page_info(self, index):
         row = index.row()
-        combo_value = self.ui.comboBox_view.currentText()
+        combo_value = self.update_value
 
         data_extractors = {
             "student": (self.info.show_student_info, [0, 1, 2, 3]),
@@ -117,6 +138,14 @@ class MainWindow(QMainWindow):
             "course": (self.info.show_course_info, [0, 1, 2]),
             "block": (self.info.show_block_info, [0, 1, 2]),
             "room": (self.info.show_room_info, [0, 1, 2]),
+            "room schedule": (
+                self.info.show_room_schedule_info,
+                [0, 1, 2, 3, 4, 5, 6, 7],
+            ),
+            "subject schedule": (
+                self.info.show_subject_schedule_info,
+                [0, 1, 2, 3, 4, 5],
+            ),
         }
 
         if combo_value in data_extractors:

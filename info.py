@@ -1,6 +1,6 @@
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import Qt
-from PyQt5.QtSql import QSqlQuery
+from PyQt5.QtSql import QSqlQuery, QSqlTableModel
 
 
 class Info:
@@ -122,6 +122,7 @@ class Info:
             "Block:": student_data[3],
         }
         self.setup_info("Student Information", fields, "student", student_data)
+        self.show_tableView_student_subjects(student_data[0])
 
     def show_teacher_info(self, teacher_data):
         fields = {
@@ -130,6 +131,7 @@ class Info:
             "Department:": teacher_data[2],
         }
         self.setup_info("Teacher Information", fields, "teacher", teacher_data)
+        self.show_tableView_teacher_subjects(teacher_data[0])
 
     def show_department_info(self, department_data):
         fields = {
@@ -137,6 +139,7 @@ class Info:
             "Department Name:": department_data[1],
         }
         self.setup_info("Department Information", fields, "department", department_data)
+        self.ui.tableView_info.setModel(None)
 
     def show_subject_info(self, subject_data):
         fields = {
@@ -146,6 +149,7 @@ class Info:
             "Units:": subject_data[3],
         }
         self.setup_info("Subject Information", fields, "subject", subject_data)
+        self.ui.tableView_info.setModel(None)
 
     def show_course_info(self, course_data):
         fields = {
@@ -154,6 +158,7 @@ class Info:
             "Department:": course_data[2],
         }
         self.setup_info("Course Information", fields, "course", course_data)
+        self.ui.tableView_info.setModel(None)
 
     def show_block_info(self, block_data):
         fields = {
@@ -162,6 +167,7 @@ class Info:
             "Course:": block_data[2],
         }
         self.setup_info("Block Information", fields, "block", block_data)
+        self.ui.tableView_info.setModel(None)
 
     def show_room_info(self, room_data):
         fields = {
@@ -170,3 +176,144 @@ class Info:
             "Building:": room_data[2],
         }
         self.setup_info("Room Information", fields, "room", room_data)
+        self.show_tableView_rooms_used(room_data[0])
+
+    def show_room_schedule_info(self, room_data):
+        fields = {
+            "Room Schedule ID:": room_data[0],
+            "Room Schedule Name:": room_data[1],
+            "Room ID": room_data[2],
+            "Day Available": room_data[3],
+            "Time Start": room_data[4],
+            "Time End": room_data[5],
+            "Is Available?": room_data[6],
+        }
+        self.setup_info("Room Information", fields, "room", room_data)
+        self.ui.tableView_info.setModel(None)
+
+    def show_subject_schedule_info(self, sched_data):
+        fields = {
+            "Sched ID:": sched_data[0],
+            "Sched Name:": sched_data[1],
+            "Subject Code:": sched_data[2],
+            "Teacher ID:": sched_data[3],
+            "Block ID:": sched_data[4],
+            "Room Avail ID:": sched_data[5],
+        }
+        self.setup_info(
+            "Subject Schedule Information", fields, "subject schedule", sched_data
+        )
+        self.show_tableView_students_enrolled(sched_data[0])
+
+    def show_tableView_students_enrolled(self, sched_id):
+        model = QSqlTableModel(None, self.db)
+        model.setTable("tbl_student")
+
+        query = QSqlQuery(self.db)
+        query.prepare(
+            "SELECT student_id FROM tbl_enrollment WHERE sched_id = :sched_id"
+        )
+        query.bindValue(":sched_id", sched_id)
+
+        if not query.exec_():
+            model.setFilter("1=0")
+        else:
+            student_ids = []
+            while query.next():
+                student_ids.append(f"'{query.value(0)}'")
+
+            if student_ids:
+                filter_str = f"student_id IN ({','.join(student_ids)})"
+                model.setFilter(filter_str)
+            else:
+                model.setFilter("1=0")
+
+        model.select()
+        model.setHeaderData(model.fieldIndex("student_id"), Qt.Horizontal, "Student ID")
+        model.setHeaderData(
+            model.fieldIndex("student_name"), Qt.Horizontal, "Student Name"
+        )
+        model.setHeaderData(model.fieldIndex("course_id"), Qt.Horizontal, "Course")
+        model.setHeaderData(model.fieldIndex("year_level"), Qt.Horizontal, "Year Level")
+        self.view_manager.setup_table_view(self.ui.tableView_info, model)
+
+    def show_tableView_rooms_used(self, room_id):
+        """Display all room schedules (rooms used) for a specific room_id in the tableView_info using tbl_room_sched."""
+        model = QSqlTableModel(None, self.db)
+        model.setTable("tbl_room_sched")
+        # Filter for the given room_id
+        model.setFilter(f"room_id = '{room_id}'")
+        model.select()
+        # Set headers for each column
+        model.setHeaderData(
+            model.fieldIndex("room_avail_id"), Qt.Horizontal, "Room Avail ID"
+        )
+        model.setHeaderData(
+            model.fieldIndex("room_avail_name"), Qt.Horizontal, "Room Avail Name"
+        )
+        model.setHeaderData(model.fieldIndex("room_id"), Qt.Horizontal, "Room ID")
+        model.setHeaderData(
+            model.fieldIndex("day_available"), Qt.Horizontal, "Day Available"
+        )
+        model.setHeaderData(model.fieldIndex("time_start"), Qt.Horizontal, "Time Start")
+        model.setHeaderData(model.fieldIndex("time_end"), Qt.Horizontal, "Time End")
+        model.setHeaderData(
+            model.fieldIndex("is_available"), Qt.Horizontal, "Is Available?"
+        )
+        self.view_manager.setup_table_view(self.ui.tableView_info, model)
+
+    def show_tableView_student_subjects(self, student_id):
+        """Display all subject schedules a student is enrolled in, using tbl_subject_sched and tbl_enrollment."""
+        model = QSqlTableModel(None, self.db)
+        model.setTable("tbl_subject_sched")
+
+        query = QSqlQuery(self.db)
+        query.prepare(
+            "SELECT sched_id FROM tbl_enrollment WHERE student_id = :student_id"
+        )
+        query.bindValue(":student_id", student_id)
+
+        if not query.exec_():
+            model.setFilter("1=0")
+        else:
+            sched_ids = []
+            while query.next():
+                sched_ids.append(f"'{query.value(0)}'")
+
+            if sched_ids:
+                filter_str = f"sched_id IN ({','.join(sched_ids)})"
+                model.setFilter(filter_str)
+            else:
+                model.setFilter("1=0")
+
+        model.select()
+        model.setHeaderData(model.fieldIndex("sched_id"), Qt.Horizontal, "Sched ID")
+        model.setHeaderData(model.fieldIndex("sched_name"), Qt.Horizontal, "Sched Name")
+        model.setHeaderData(
+            model.fieldIndex("subject_code"), Qt.Horizontal, "Subject Code"
+        )
+        model.setHeaderData(model.fieldIndex("teacher_id"), Qt.Horizontal, "Teacher ID")
+        model.setHeaderData(model.fieldIndex("block_id"), Qt.Horizontal, "Block ID")
+        model.setHeaderData(
+            model.fieldIndex("room_avail_id"), Qt.Horizontal, "Room Avail ID"
+        )
+        self.view_manager.setup_table_view(self.ui.tableView_info, model)
+
+    def show_tableView_teacher_subjects(self, teacher_id):
+        """Display all subject schedules assigned to a teacher, using tbl_subject_sched."""
+        model = QSqlTableModel(None, self.db)
+        model.setTable("tbl_subject_sched")
+        # Filter for the given teacher_id
+        model.setFilter(f"teacher_id = '{teacher_id}'")
+        model.select()
+        model.setHeaderData(model.fieldIndex("sched_id"), Qt.Horizontal, "Sched ID")
+        model.setHeaderData(model.fieldIndex("sched_name"), Qt.Horizontal, "Sched Name")
+        model.setHeaderData(
+            model.fieldIndex("subject_code"), Qt.Horizontal, "Subject Code"
+        )
+        model.setHeaderData(model.fieldIndex("teacher_id"), Qt.Horizontal, "Teacher ID")
+        model.setHeaderData(model.fieldIndex("block_id"), Qt.Horizontal, "Block ID")
+        model.setHeaderData(
+            model.fieldIndex("room_avail_id"), Qt.Horizontal, "Room Avail ID"
+        )
+        self.view_manager.setup_table_view(self.ui.tableView_info, model)
